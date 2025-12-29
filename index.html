@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D 5e Assistant</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDQP3qV8yZ7K9nX2fJ5mL8wR3tY6pU4vN2",
+            authDomain: "dnd-assistant-demo.firebaseapp.com",
+            databaseURL: "https://dnd-assistant-demo-default-rtdb.firebaseio.com",
+            projectId: "dnd-assistant-demo",
+            storageBucket: "dnd-assistant-demo.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef123456"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // Lucide icons as SVG components
+        const Sword = ({ className = "w-6 h-6" }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19 9 15"/><path d="m16 16 5 5"/><path d="m19 21 2-2"/></svg>;
+        const Shield = ({ className = "w-6 h-6" }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+        const Dice6 = ({ className = "w-6 h-6" }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M16 12h.01"/><path d="M8 12h.01"/></svg>;
+        const Users = ({ className = "w-6 h-6" }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+        const Package = ({ className = "w-6 h-6" }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>;
+        const BookOpen = ({ className = "w-6 h-6" }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+
+        const App = () => {
+          const [view, setView] = useState('landing');
+          const [session, setSession] = useState(null);
+
+          useEffect(() => {
+            const dm = localStorage.getItem('dndCampaigns');
+            const player = localStorage.getItem('playerSession');
+            setSession({ dm: dm ? JSON.parse(dm) : null, player: player ? JSON.parse(player) : null });
+          }, []);
+
+          const refreshSession = () => {
+            const dm = localStorage.getItem('dndCampaigns');
+            const player = localStorage.getItem('playerSession');
+            setSession({ dm: dm ? JSON.parse(dm) : null, player: player ? JSON.parse(player) : null });
+          };
+
+          if (view === 'dm') return <DMView onBack={() => { setView('landing'); refreshSession(); }} />;
+          if (view === 'player') return <PlayerView onBack={() => { setView('landing'); refreshSession(); }} />;
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center p-6">
+              <div className="max-w-4xl w-full">
+                <div className="text-center mb-12">
+                  <Dice6 className="w-20 h-20 text-yellow-400 mx-auto mb-6 animate-pulse" />
+                  <h1 className="text-5xl font-bold text-white mb-4">D&D 5e Assistant</h1>
+                  <p className="text-xl text-indigo-200">Your digital companion for epic adventures</p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-8">
+                  <button onClick={() => setView('dm')} className="bg-white rounded-lg shadow-2xl p-8 hover:shadow-purple-500/50 transition-all transform hover:scale-105 text-left">
+                    <div className="flex items-center gap-4 mb-4">
+                      <Shield className="w-12 h-12 text-purple-600" />
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-800">I'm a Dungeon Master</h2>
+                        <p className="text-sm text-gray-600">Create and manage campaigns</p>
+                      </div>
+                    </div>
+                    <p className="text-gray-700">Create campaigns, manage parties, and guide players.</p>
+                  </button>
+
+                  <button onClick={() => setView('player')} className="bg-white rounded-lg shadow-2xl p-8 hover:shadow-blue-500/50 transition-all transform hover:scale-105 text-left">
+                    <div className="flex items-center gap-4 mb-4">
+                      <Sword className="w-12 h-12 text-blue-600" />
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-800">I'm a Player</h2>
+                        <p className="text-sm text-gray-600">Join a campaign and play</p>
+                      </div>
+                    </div>
+                    <p className="text-gray-700">Join with a code and create your character.</p>
+                  </button>
+                </div>
+
+                {(session?.dm || session?.player) && (
+                  <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6">
+                    <h3 className="text-xl font-bold text-white mb-4">Continue Your Adventure</h3>
+                    {session?.dm && session.dm.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-indigo-200 text-sm mb-2">Your Campaigns (DM)</p>
+                        {session.dm.map(c => (
+                          <button key={c.id} onClick={() => setView('dm')} className="w-full p-4 bg-white/20 hover:bg-white/30 rounded-lg text-left mb-2">
+                            <p className="text-white font-semibold">{c.campaign.name || 'Untitled'}</p>
+                            <p className="text-indigo-200 text-sm">Code: {c.code}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {session?.player && (
+                      <button onClick={() => setView('player')} className="w-full p-4 bg-white/20 hover:bg-white/30 rounded-lg text-left">
+                        <p className="text-white font-semibold">{session.player.character.name}</p>
+                        <p className="text-indigo-200 text-sm">{session.player.character.race} {session.player.character.class}</p>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        };
+
+        const DMView = ({ onBack }) => {
+          const [campaigns, setCampaigns] = useState([]);
+          const [currentId, setCurrentId] = useState(null);
+          const [campaign, setCampaign] = useState({ name: '', notes: '' });
+          const [characters, setCharacters] = useState([]);
+
+          useEffect(() => {
+            const saved = localStorage.getItem('dndCampaigns');
+            if (saved) setCampaigns(JSON.parse(saved));
+          }, []);
+
+          useEffect(() => {
+            if (currentId) {
+              const current = campaigns.find(c => c.id === currentId);
+              if (current) {
+                setCampaign(current.campaign);
+                setCharacters(current.characters);
+                
+                // Listen for changes from Firebase
+                const campaignRef = database.ref(`campaigns/${current.code}`);
+                campaignRef.on('value', (snapshot) => {
+                  const data = snapshot.val();
+                  if (data) {
+                    setCharacters(data.characters || []);
+                    setCampaign(data.campaign);
+                  }
+                });
+
+                return () => campaignRef.off();
+              }
+            }
+          }, [currentId]);
+
+          useEffect(() => {
+            if (currentId) {
+              const updated = campaigns.map(c => c.id === currentId ? { ...c, campaign, characters } : c);
+              setCampaigns(updated);
+              localStorage.setItem('dndCampaigns', JSON.stringify(updated));
+              
+              // Save to Firebase
+              const current = campaigns.find(c => c.id === currentId);
+              if (current?.code) {
+                database.ref(`campaigns/${current.code}`).set({
+                  campaign,
+                  characters,
+                  code: current.code
+                });
+              }
+            }
+          }, [campaign, characters]);
+
+          const createCampaign = (name) => {
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const newCamp = { id: Date.now(), code, campaign: { name, notes: '' }, characters: [] };
+            
+            // Save to Firebase
+            database.ref(`campaigns/${code}`).set({
+              campaign: newCamp.campaign,
+              characters: [],
+              code
+            });
+            
+            const updated = [...campaigns, newCamp];
+            setCampaigns(updated);
+            localStorage.setItem('dndCampaigns', JSON.stringify(updated));
+            setCurrentId(newCamp.id);
+          };
+
+          if (!currentId) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 p-6 flex items-center justify-center">
+                <div className="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full">
+                  <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-3xl font-bold">Select Campaign</h1>
+                    <button onClick={onBack} className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">Back</button>
+                  </div>
+                  
+                  {campaigns.map(c => (
+                    <button key={c.id} onClick={() => setCurrentId(c.id)} className="w-full p-4 border-2 rounded-lg hover:border-indigo-600 text-left mb-3">
+                      <h3 className="font-bold">{c.campaign.name || 'Untitled'}</h3>
+                      <p className="text-sm text-gray-600">Code: {c.code}</p>
+                    </button>
+                  ))}
+                  
+                  <input type="text" placeholder="New Campaign Name" className="w-full p-3 border rounded-lg mb-3" onKeyPress={(e) => e.key === 'Enter' && e.target.value && createCampaign(e.target.value)} />
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 p-6">
+              <div className="max-w-7xl mx-auto">
+                <div className="flex justify-between items-center mb-8">
+                  <h1 className="text-4xl font-bold text-white">Campaign Dashboard</h1>
+                  <button onClick={() => setCurrentId(null)} className="px-4 py-2 bg-white rounded-lg hover:bg-gray-100">Switch</button>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-xl p-6 mb-6">
+                  <h2 className="text-2xl font-bold mb-4">Campaign Info</h2>
+                  {campaigns.find(c => c.id === currentId)?.code && (
+                    <div className="p-4 bg-indigo-100 rounded-lg inline-block mb-4">
+                      <p className="text-sm text-gray-600">Player Code:</p>
+                      <p className="text-3xl font-bold text-indigo-700">{campaigns.find(c => c.id === currentId).code}</p>
+                    </div>
+                  )}
+                  <input type="text" value={campaign.name} onChange={(e) => setCampaign({ ...campaign, name: e.target.value })} placeholder="Campaign Name" className="w-full p-2 border rounded mb-3" />
+                  <textarea value={campaign.notes} onChange={(e) => setCampaign({ ...campaign, notes: e.target.value })} placeholder="Campaign Notes" className="w-full p-2 border rounded h-32" />
+                </div>
+
+                <div className="bg-white rounded-lg shadow-xl p-6">
+                  <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Users />Characters</h2>
+                  {characters.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">No characters yet. Players can join with code above!</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {characters.map(char => (
+                        <div key={char.id} className="border rounded-lg p-4">
+                          <h3 className="font-bold">{char.name}</h3>
+                          <p className="text-sm text-gray-600">{char.race} {char.class}</p>
+                          <p className="text-sm">HP: {char.hp}/{char.maxHp}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const PlayerView = ({ onBack }) => {
+          const [code, setCode] = useState('');
+          const [joined, setJoined] = useState(false);
+          const [char, setChar] = useState(null);
+          const [campData, setCampData] = useState(null);
+          const [showCreate, setShowCreate] = useState(false);
+          const [newChar, setNewChar] = useState({ name: '', race: '', class: '', level: 1, hp: 10, maxHp: 10, ac: 10, inventory: [] });
+
+          const races = ['Dragonborn', 'Dwarf', 'Elf', 'Gnome', 'Half-Elf', 'Half-Orc', 'Halfling', 'Human', 'Tiefling'];
+          const classes = ['Barbarian', 'Bard', 'Cleric', 'Druid', 'Fighter', 'Monk', 'Paladin', 'Ranger', 'Rogue', 'Sorcerer', 'Warlock', 'Wizard'];
+
+          useEffect(() => {
+            const saved = localStorage.getItem('playerSession');
+            if (saved) {
+              const session = JSON.parse(saved);
+              setCode(session.campaignCode);
+              setChar(session.character);
+              setJoined(true);
+              
+              // Listen for campaign updates
+              const campaignRef = database.ref(`campaigns/${session.campaignCode}`);
+              campaignRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                  setCampData(data);
+                  const updatedChar = data.characters.find(c => c.id === session.character.id);
+                  if (updatedChar) {
+                    setChar(updatedChar);
+                  }
+                }
+              });
+
+              return () => campaignRef.off();
+            }
+          }, []);
+
+          const join = () => {
+            database.ref(`campaigns/${code.toUpperCase()}`).once('value', (snapshot) => {
+              if (snapshot.exists()) {
+                setCampData(snapshot.val());
+                setJoined(true);
+                setShowCreate(true);
+              } else {
+                alert('Campaign not found');
+              }
+            });
+          };
+
+          const create = () => {
+            if (!newChar.name || !newChar.race || !newChar.class) {
+              alert('Fill all fields');
+              return;
+            }
+            const character = { ...newChar, id: Date.now() };
+            
+            database.ref(`campaigns/${code}/characters`).once('value', (snapshot) => {
+              const existingChars = snapshot.val() || [];
+              const updated = Array.isArray(existingChars) ? [...existingChars, character] : [character];
+              
+              database.ref(`campaigns/${code}/characters`).set(updated);
+              localStorage.setItem('playerSession', JSON.stringify({ campaignCode: code, character }));
+              setChar(character);
+              setShowCreate(false);
+            });
+          };
+
+          if (!joined) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center p-6">
+                <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full">
+                  <button onClick={onBack} className="mb-4 px-3 py-1 bg-gray-300 rounded text-sm hover:bg-gray-400">Back</button>
+                  <Sword className="w-16 h-16 mx-auto text-indigo-600 mb-4" />
+                  <h1 className="text-3xl font-bold text-center mb-6">Join Campaign</h1>
+                  <input type="text" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ENTER CODE" maxLength={6} className="w-full p-3 border-2 rounded-lg text-center text-2xl font-bold uppercase mb-4" />
+                  <button onClick={join} className="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">Join</button>
+                </div>
+              </div>
+            );
+          }
+
+          if (showCreate) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 p-6">
+                <div className="max-w-2xl mx-auto">
+                  <div className="bg-white rounded-lg shadow-xl p-8">
+                    <h1 className="text-3xl font-bold mb-6">Create Character</h1>
+                    <input type="text" placeholder="Character Name" value={newChar.name} onChange={(e) => setNewChar({ ...newChar, name: e.target.value })} className="w-full p-3 border rounded-lg mb-4" />
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <select value={newChar.race} onChange={(e) => setNewChar({ ...newChar, race: e.target.value })} className="w-full p-3 border rounded-lg bg-white">
+                        <option value="">Select Race</option>
+                        {races.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      <select value={newChar.class} onChange={(e) => setNewChar({ ...newChar, class: e.target.value })} className="w-full p-3 border rounded-lg bg-white">
+                        <option value="">Select Class</option>
+                        {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <button onClick={create} className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">Create Character</button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 p-6">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="text-white">
+                    <h1 className="text-3xl font-bold">{char.name}</h1>
+                    <p className="text-indigo-200">{char.race} {char.class}</p>
+                  </div>
+                  <button onClick={() => { localStorage.removeItem('playerSession'); onBack(); }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    Leave Campaign
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-xl p-6 mb-6">
+                  <h2 className="text-2xl font-bold mb-4">Character Stats</h2>
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="text-center p-4 bg-red-50 rounded-lg">
+                      <p className="text-sm text-gray-600 mb-1">HP</p>
+                      <p className="text-3xl font-bold text-red-600">{char.hp}/{char.maxHp}</p>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-gray-600 mb-1">AC</p>
+                      <p className="text-3xl font-bold text-blue-600">{char.ac}</p>
+                    </div>
+                    <div className="text-center p-4 bg-purple-50 rounded-lg">
+                      <p className="text-sm text-gray-600 mb-1">Level</p>
+                      <p className="text-3xl font-bold text-purple-600">{char.level}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-xl p-6">
+                  <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Package />Inventory</h2>
+                  {char.inventory.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">No items yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {char.inventory.map(item => (
+                        <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{item.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {campData?.campaign.notes && (
+                  <div className="bg-white rounded-lg shadow-xl p-6 mt-6">
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><BookOpen />Campaign Info</h2>
+                    <p className="text-sm whitespace-pre-wrap">{campData.campaign.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
